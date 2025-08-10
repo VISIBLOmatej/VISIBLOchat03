@@ -1,4 +1,3 @@
-// Service Worker pro VISIBLO Chat
 const CACHE_NAME = 'visiblo-chat-v2';
 const STATIC_CACHE = [
   '/',
@@ -13,49 +12,48 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_CACHE).catch((error) => {
         console.log('Cache addAll failed:', error);
       });
-    }).then(() => {
-      return self.skipWaiting();
-    })
+    }).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   console.log('Service Worker activating');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
-      );
-    }).then(() => {
-      return self.clients.claim();
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.url.includes('/api/') || event.request.url.includes('firebase')) {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
 
-// Handle notifications
 self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked:', event);
-  
   event.notification.close();
-  
-  // Focus or open the app window
+
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then((clientList) => {
-      // Try to focus existing window first
-      for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i];
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
         if (client.url.includes(self.location.origin)) {
           return client.focus();
         }
       }
-      // Open new window if none found
       if (clients.openWindow) {
         return clients.openWindow('/');
       }
@@ -67,16 +65,30 @@ self.addEventListener('notificationclose', (event) => {
   console.log('Notification closed:', event);
 });
 
-// Simple fetch handler for offline support
-self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api/') || event.request.url.includes('firebase')) {
-    // Don't cache API calls or Firebase
-    return;
+// **Důležitý push handler pro přijímání push notifikací**
+self.addEventListener('push', function(event) {
+  console.log('Push received:', event);
+
+  let data = { title: 'VISIBLO Chat', body: 'Nová zpráva' };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data.body = event.data.text();
+    }
   }
-  
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+
+  const options = {
+    body: data.body,
+    icon: '/vite.svg',
+    badge: '/vite.svg',
+    tag: 'visiblo-message',
+    silent: false,
+    requireInteraction: false
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
   );
 });
