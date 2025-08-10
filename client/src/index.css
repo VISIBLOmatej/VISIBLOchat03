@@ -169,3 +169,13 @@
     opacity: 1;
   }
 }
+/* Oprava pro PWA klikatelnost polí na mobilu */
+input, textarea, select {
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+  pointer-events: auto !important;
+}
+
+.animate-fade-in {
+  pointer-events: auto !important;
+}
