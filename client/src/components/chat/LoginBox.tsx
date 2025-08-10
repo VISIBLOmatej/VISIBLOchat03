@@ -44,7 +44,7 @@ export function LoginBox({ onLogin }: LoginBoxProps) {
   };
 
   return (
-    <div className="text-center animate-fade-in">
+    <div className="text-center">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-visiblo-text mb-2">VISIBLO Chat</h1>
         <p className="text-sm sm:text-base text-visiblo-text/70">Profesionální komunikační platforma</p>
