@@ -6,32 +6,27 @@ export class NotificationManager {
 
   async initialize(isAdmin: boolean = false) {
     this.isAdmin = isAdmin;
-    
-    // Registrovat Service Worker pouze pro admin
-    if (!isAdmin) return false;
-    
+
     if (!('serviceWorker' in navigator)) {
       console.log('Service Worker not supported');
       return false;
     }
 
     try {
-      // Unregister existing service worker if exists
-      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of existingRegistrations) {
-        await registration.unregister();
-      }
-      
+      // Registrovat SW vždy, neodstraňovat existující registrace
       this.registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/'
       });
-      
+
       await navigator.serviceWorker.ready;
       console.log('Service Worker registered and ready');
-      
-      // Označit zařízení jako admin
-      localStorage.setItem(this.STORAGE_KEY, 'true');
-      
+
+      if (isAdmin) {
+        localStorage.setItem(this.STORAGE_KEY, 'true');
+      } else {
+        localStorage.removeItem(this.STORAGE_KEY);
+      }
+
       return true;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
@@ -45,7 +40,7 @@ export class NotificationManager {
 
   async requestPermission(): Promise<boolean> {
     if (!this.isAdmin && !this.isAdminDevice()) return false;
-    
+
     if (!('Notification' in window)) {
       console.log('Notifications not supported');
       return false;
@@ -62,7 +57,7 @@ export class NotificationManager {
       if (granted) {
         localStorage.setItem(this.STORAGE_KEY + '-permission', 'granted');
       }
-      
+
       return granted;
     } catch (error) {
       console.error('Permission request failed:', error);
@@ -78,7 +73,6 @@ export class NotificationManager {
   async showLocalNotification(title: string, body: string): Promise<void> {
     if (!this.isAdminDevice() || this.getCurrentPermission() !== 'granted') return;
 
-    // Zkontrolovat, jestli je aplikace aktivní
     if (document.visibilityState === 'visible' && document.hasFocus()) {
       return; // Neposílat notifikaci, když je aplikace aktivní
     }
@@ -93,16 +87,13 @@ export class NotificationManager {
         tag: 'visiblo-message'
       };
 
-      // Pokusit se použít service worker pro notifikaci
       if (this.registration && this.registration.active) {
         await this.registration.showNotification(title, options);
       } else {
-        // Fallback na browser notification
         new Notification(title, options);
       }
     } catch (error) {
       console.error('Failed to show notification:', error);
-      // Fallback na browser notification
       try {
         new Notification(title, {
           body,
