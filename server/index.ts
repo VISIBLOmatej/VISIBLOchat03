@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import nodemailer from "nodemailer"; // Přidáno pro emaily
 
 const app = express();
 app.use(express.json());
@@ -36,6 +37,38 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- Nový emailový endpoint ---
+app.post('/api/send-email', async (req: Request, res: Response) => {
+  const { subject, text } = req.body;
+
+  if (!subject || !text) {
+    return res.status(400).json({ error: 'Missing subject or text' });
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"VISIBLO Chat" <${process.env.EMAIL_USER}>`,
+      to: 'matyaspohoda@gmail.com',
+      subject,
+      text,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Email send error:', error);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+// --- Konec emailového endpointu ---
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -47,19 +80,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
